@@ -23,9 +23,9 @@ int main() {
   printf("Hello, Easylink!\n");
 
   int reuse_addr = 1, server_fd, client_addr_len, res_addr_info;
-  struct addrinfo servinfo_base, *servinfo; // points to the results
-                                            // which is a linked-list with 1 or
-                                            // more addrinfo structs
+  struct addrinfo servinfo_base, *servinfo, *p; // points to the results
+                                                // which is a linked-list with 1
+                                                // or more addrinfo structs
 
   // a pointer to a struct `sockaddr_in` can be cast to a pointer to a
   // struct `sockaddr` and vice-versa. So even though connect() wants a
@@ -33,12 +33,18 @@ int main() {
   // it at the last minute
   struct sockaddr_in client_addr, serv_addr;
 
-  memset(&servinfo_base, 0, sizeof(servinfo_base)); // ensure empty struct
-  servinfo_base.ai_family = AF_INET;                // IPv4 or IPv6
-  servinfo_base.ai_socktype = SOCK_STREAM;          // TCP stream sockets
-  servinfo_base.ai_flags = AI_PASSIVE;              // use my IP
+  // servinfo_base is basically the shopping list of what we _want_
+  // getaddrinfo() to look for
+  memset(&servinfo_base, 0, sizeof(servinfo_base)); // start with an empty list
+  servinfo_base.ai_family = AF_INET;                // we want IPv4 or IPv6
+  servinfo_base.ai_socktype = SOCK_STREAM; // we want TCP stream sockets
+  servinfo_base.ai_flags = AI_PASSIVE;     // use my IP, aka bindable addresses
 
+  //  we get is a linked list of addresses when calling getaddrinfo -> we save
+  //  in servinfo. each node contains complete socket creation info it could be
+  //  one, it could be many - who knows?
   res_addr_info = getaddrinfo(NULL, PORT, &servinfo_base, &servinfo);
+
   if (res_addr_info != 0) { // 0 = success, -1 = error
     fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(res_addr_info));
     return 1;
