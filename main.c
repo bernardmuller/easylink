@@ -14,6 +14,7 @@
 // #include <time.h>
 
 #define PORT "8080"
+#define BACKLOG 5 // only hold a maximum of 5 pending connections
 
 int main() {
   // Disable output buffering
@@ -22,7 +23,14 @@ int main() {
 
   printf("Hello, Easylink!\n");
 
-  int reuse_addr = 1, server_fd, client_addr_len, res_addr_info;
+  // for http servers the order of operations are:
+  // getraddrinfo();
+  // socket();
+  // bind();
+  // listen();
+
+  int reuse_addr = 1, server_fd, socket_opts, binding, conn, res_addr_info,
+      yes = 1;
   struct addrinfo servinfo_base, *servinfo, *p; // points to the results
                                                 // which is a linked-list with 1
                                                 // or more addrinfo structs
@@ -50,75 +58,87 @@ int main() {
     return 1;
   }
 
-  //
-  // do all the socket stuff here
-  //
+  for (p = servinfo; p != NULL; p->ai_next) {
+    server_fd = socket(servinfo->ai_family, servinfo->ai_socktype,
+                       servinfo->ai_protocol);
+    if (server_fd == -1) {
+      perror("server: socket");
+      continue;
+    }
 
-  server_fd =
-      socket(servinfo->ai_family, servinfo->ai_socktype, servinfo->ai_protocol);
-  if (server_fd == -1) {
-    fprintf(stderr, "Socket creation failed: %s... \n",
-            gai_strerror(server_fd));
+    // reuse addresses
+    socket_opts = setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &yes,
+                             sizeof(reuse_addr));
+    if (socket_opts == -1) {
+      perror("setsockopt");
+      exit(1);
+    }
+
+    // bind the addrress to a name, any socket address is initially unnamed
+    // because we are writing a server and not a client, we are using bind()
+    // instead of connect()
+    binding = bind(server_fd, p->ai_addr, p->ai_addrlen);
+    if (binding == -1) {
+      close(server_fd);
+      perror("server: bind");
+      continue;
+    }
+
+    break;
+  }
+
+  freeaddrinfo(servinfo); // free the linked list
+
+  if (p == NULL) {
+    fprintf(stderr, "server: failed to bind\n");
     exit(1);
   }
 
-  //
-  // do serverstuff above this
-  //
-  freeaddrinfo(servinfo); // free the linked list
-
-  int access_level =
-      SOL_SOCKET; // access options on socket level, not protocol level
-  int reuse_local_addresses = SO_REUSEADDR;
-  if (setsockopt(server_fd, access_level, reuse_local_addresses, &reuse_addr,
-                 sizeof(reuse_addr)) < 0) {
-    printf("SO_REUSEADDR failed: %s \n", strerror(errno));
-    return 1;
-  }
-
-  serv_addr.sin_family = AF_INET;
-  serv_addr.sin_port = htons(4221); // port number in Network Byte Order
-                                    // (host to network short (2 byte number))
-                                    //
-  // TODO: Fix this
-  // serv_addr.sin_addr = addr{htonl(INADDR_ANY)}; // IPv4 address
-
-  if (bind(server_fd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) != 0) {
-    printf("Bind failed: %s \n", strerror(errno));
-    return 1;
-  }
-
-  int connection_backlog = 5;
   // marks a socket as accepting connections
-  if (listen(server_fd, connection_backlog) != 0) {
-    printf("Listen failed: %s \n", strerror(errno));
-    return 1;
+  if (listen(server_fd, BACKLOG) != 0) {
+    perror("server: listen");
+    exit(1);
   }
 
+  // get the host address information so we can print a cool message
+  // stating where we are listening
   char hostBuffer[NI_MAXHOST], serviceBuffer[NI_MAXSERV];
-  int error =
+  int name_info =
       getnameinfo((struct sockaddr *)&serv_addr, sizeof(serv_addr), hostBuffer,
                   sizeof(hostBuffer), serviceBuffer, sizeof(serviceBuffer), 0);
 
-  if (error != 0) {
-    printf("Error: %s\n", gai_strerror(error));
-    return 1;
+  if (name_info != 0) {
+    perror("server: name_info");
+    exit(1);
   }
 
   printf("\nServer is listening on http://%s:%s/\n\n", hostBuffer,
          serviceBuffer);
 
-  client_addr_len = sizeof(client_addr);
-
   while (1) {
     // extracts first connection on queue of pending connection, creates a
-    // socket and allocates a file descriptor
-    int id =
-        accept(server_fd, (struct sockaddr *)&client_addr, &client_addr_len);
+    // socket and allocates a *new* file descriptor
+    //
+    // we now have 2 open socket file descriptors,
+    // one that listens for new connections and
+    // another that handles an accepted connection
+    socklen_t sin_size = sizeof client_addr;
+    int connection_fd =
+        accept(server_fd, (struct sockaddr *)&client_addr, &sin_size);
 
+    // we will do the http parsing stuff here
     char *buf = "HTTP/1.1 200 OK\r\n\r\n";
+    int len, bytes_sent;
 
-    send(id, (void *)buf, strlen(buf), 0);
+    // send returns the amount of bytes that were sent, if it is less than the
+    // length of the buffer we need to send the rest so will probably need logic
+    // for that
+    bytes_sent = send(connection_fd, (void *)buf, strlen(buf), 0);
+    if (bytes_sent == -1) {
+      perror("server: send");
+    }
+
+    close(connection_fd);
   }
   close(server_fd);
   return 0;
