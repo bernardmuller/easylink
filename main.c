@@ -1,25 +1,33 @@
 #include <asm-generic/socket.h>
-#include <errno.h>
+// #include <errno.h>
 #include <netdb.h> // getnameinfo
 #include <netinet/in.h>
 #include <netinet/in.h> // sockaddr_in
 #include <netinet/ip.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h> // socket APIs
 #include <unistd.h>
 #include <unistd.h> // open, close
-// #include <signal.h> // signal handling
 // #include <time.h>
 
 #define PORT "8080"
 #define BACKLOG 5 // only hold a maximum of 5 pending connections
 
+void signal_handler(int sig) {
+  printf("SIG CAUGHT: %d\n", sig);
+  exit(sig);
+}
+
 int main() {
   // Disable output buffering
   setbuf(stdout, NULL);
   setbuf(stderr, NULL);
+
+  signal(SIGINT, signal_handler);
+  signal(SIGTERM, signal_handler);
 
   printf("Hello, Easylink!\n");
 
@@ -58,7 +66,7 @@ int main() {
     return 1;
   }
 
-  for (p = servinfo; p != NULL; p->ai_next) {
+  for (p = servinfo; p != NULL; p = p->ai_next) {
     server_fd = socket(servinfo->ai_family, servinfo->ai_socktype,
                        servinfo->ai_protocol);
     if (server_fd == -1) {
@@ -87,8 +95,6 @@ int main() {
     break;
   }
 
-  freeaddrinfo(servinfo); // free the linked list
-
   if (p == NULL) {
     fprintf(stderr, "server: failed to bind\n");
     exit(1);
@@ -100,18 +106,17 @@ int main() {
     exit(1);
   }
 
-  // get the host address information so we can print a cool message
-  // stating where we are listening
   char hostBuffer[NI_MAXHOST], serviceBuffer[NI_MAXSERV];
   int name_info =
-      getnameinfo((struct sockaddr *)&serv_addr, sizeof(serv_addr), hostBuffer,
-                  sizeof(hostBuffer), serviceBuffer, sizeof(serviceBuffer), 0);
+      getnameinfo(p->ai_addr, p->ai_addrlen, hostBuffer, sizeof(hostBuffer),
+                  serviceBuffer, sizeof(serviceBuffer), 0);
 
   if (name_info != 0) {
     perror("server: name_info");
     exit(1);
   }
 
+  freeaddrinfo(servinfo); // free the linked list
   printf("\nServer is listening on http://%s:%s/\n\n", hostBuffer,
          serviceBuffer);
 
@@ -141,5 +146,6 @@ int main() {
     close(connection_fd);
   }
   close(server_fd);
+
   return 0;
 }
