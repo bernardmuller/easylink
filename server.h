@@ -4,6 +4,6 @@
 #include <netdb.h>
 #include <netinet/in.h>
 
-void start_server(char(*port)[]);
+void start_server(const char *port);
 
 #endif
