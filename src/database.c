@@ -39,7 +39,7 @@ void *handle_client_thread(void *arg_fd) {
   return NULL;
 }
 
-int main() {
+int database() {
   setbuf(stdout, NULL);
   setbuf(stderr, NULL);
 
