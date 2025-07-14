@@ -11,13 +11,15 @@
 
 #define PORT "8080"
 #define BUFFER_SIZE 256
+#define USAGE_MSG "./program_name <path/to/file>"
 
 typedef struct Error {
   enum ErrorType {
     ERROR_NONE = 0,
     ERROR_TODO,
     ERROR_MEMORY,
-    ERROR_ARGUMENTS
+    ERROR_ARGUMENTS,
+    ERROR_USAGE
   } type;
   const char *reference;
   const char *message;
@@ -31,21 +33,23 @@ Error ok = {ERROR_NONE, NULL, NULL};
   (n).reference = (ref);                                                       \
   (n).message = (msg);
 
-char *get_error_string(Error err) {
-  char *err_msg;
-  switch (err.type) {
+static char *get_error_type_string(enum ErrorType type) {
+  switch (type) {
   case ERROR_ARGUMENTS:
-    err_msg = "Bad Arguments";
-    break;
+    return "Bad Arguments";
+  case ERROR_USAGE:
+    return "Usage";
   default:
-    err_msg = "No error :)";
+    return "No error :)";
   }
+}
 
+char *get_error_string(Error err) {
+  static char err_str[128];
   char *div = ": ";
-  size_t len = strlen(err.reference) + strlen(err_msg) + strlen(div);
-  char *err_str = malloc(len);
+  char *type_err = get_error_type_string(err.type);
 
-  snprintf(err_str, len, "%s%s%s", err.reference, div, err_msg);
+  snprintf(err_str, sizeof(err_str), "%s%s%s", err.reference, div, type_err);
   return err_str;
 }
 
@@ -149,8 +153,8 @@ void parse(char *data) {
   }
 }
 
-int main(int argc, char **argv) {
-
+void handle_args(int argc, char **argv) {
+  Error err;
   const char *program_name = argv[0];
   const char *basename = strchr(program_name, '/');
   if (basename) {
@@ -158,30 +162,27 @@ int main(int argc, char **argv) {
   }
 
   if (argc < 2) {
-    NEW_ERROR(err, ERROR_ARGUMENTS, "main", "No file path specified");
+    NEW_ERROR(err, ERROR_USAGE, "main", USAGE_MSG);
     print_error(err);
-    return 1;
+    exit(1);
   }
 
   if (argc > 3) {
-    perror("usage: too many arguments");
-    return 1;
+    NEW_ERROR(err, ERROR_USAGE, "main", USAGE_MSG);
+    print_error(err);
+    exit(1);
   }
+}
 
-  // Disable output dataing
-  setbuf(stdout, NULL);
-  setbuf(stderr, NULL);
+int main(int argc, char **argv) {
+  handle_args(argc, argv);
 
-  signal(SIGINT, signal_handler);
-  signal(SIGTERM, signal_handler);
-
-  printf("Hello, Easylink!\n");
+  printf("Easylink!\n\n");
 
   char *data = find_and_open_file(argv[1]);
 
   parse(data);
 
   free(data);
-
-  return 0;
+  exit(0);
 }
