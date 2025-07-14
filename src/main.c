@@ -1,4 +1,3 @@
-#include "../includes/parser.h"
 #include <asm-generic/socket.h>
 #include <netdb.h>
 #include <netinet/in.h>
@@ -12,6 +11,49 @@
 
 #define PORT "8080"
 #define BUFFER_SIZE 256
+
+typedef struct Error {
+  enum ErrorType {
+    ERROR_NONE = 0,
+    ERROR_TODO,
+    ERROR_MEMORY,
+    ERROR_ARGUMENTS
+  } type;
+  const char *reference;
+  const char *message;
+} Error;
+
+Error ok = {ERROR_NONE, NULL, NULL};
+
+#define NEW_ERROR(n, t, ref, msg)                                              \
+  Error n;                                                                     \
+  (n).type = (t);                                                              \
+  (n).reference = (ref);                                                       \
+  (n).message = (msg);
+
+char *get_error_string(Error err) {
+  char *err_msg;
+  switch (err.type) {
+  case ERROR_ARGUMENTS:
+    err_msg = "Bad Arguments";
+    break;
+  default:
+    err_msg = "No error :)";
+  }
+
+  char *div = ": ";
+  size_t len = strlen(err.reference) + strlen(err_msg) + strlen(div);
+  char *err_str = malloc(len);
+
+  snprintf(err_str, len, "%s%s%s", err.reference, div, err_msg);
+  return err_str;
+}
+
+void print_error(Error err) {
+  char *err_str = get_error_string(err);
+  printf("%s: %s\n", err_str, err.message);
+  free(err_str);
+}
 
 // input for server create
 // typedef struct {
@@ -92,7 +134,23 @@ char *find_and_open_file(char path[]) {
   return data;
 }
 
-int main(int argc, char *argv[]) {
+void parse(char *data) {
+  if (!data) {
+    perror("parser: no data provided");
+    exit(1);
+  }
+
+  size_t index = 0;
+
+  while (index < strlen(data)) {
+    printf("%c\n", data[index]);
+
+    index = index + 1;
+  }
+}
+
+int main(int argc, char **argv) {
+
   const char *program_name = argv[0];
   const char *basename = strchr(program_name, '/');
   if (basename) {
@@ -100,7 +158,8 @@ int main(int argc, char *argv[]) {
   }
 
   if (argc < 2) {
-    perror("usage: no file specified");
+    NEW_ERROR(err, ERROR_ARGUMENTS, "main", "No file path specified");
+    print_error(err);
     return 1;
   }
 
@@ -120,7 +179,7 @@ int main(int argc, char *argv[]) {
 
   char *data = find_and_open_file(argv[1]);
 
-  parser(data);
+  parse(data);
 
   free(data);
 
