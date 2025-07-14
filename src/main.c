@@ -12,6 +12,7 @@
 #define PORT "8080"
 #define BUFFER_SIZE 256
 #define USAGE_MSG "./program_name <path/to/file>"
+#define MAX_TOKENS 256
 
 typedef struct Error {
   enum ErrorType {
@@ -24,6 +25,19 @@ typedef struct Error {
   const char *reference;
   const char *message;
 } Error;
+
+typedef enum TokenType {
+  TOKEN_ARRAY_START,
+  TOKEN_NUMBER,
+  TOKEN_BULK_STRING_START,
+  TOKEN_CRLF,
+  TOKEN_EOF
+} TokenType;
+
+typedef struct Token {
+  TokenType type;
+  char character;
+} Token;
 
 Error ok = {ERROR_NONE, NULL, NULL};
 
