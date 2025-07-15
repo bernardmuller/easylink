@@ -3,6 +3,7 @@
 #include <netinet/in.h>
 #include <netinet/ip.h>
 #include <signal.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -39,6 +40,14 @@ typedef struct Token {
   char character;
 } Token;
 
+// Token scan_token(char *c) {
+//   switch (c) {
+//     case "\\":
+//     default:
+//       ""
+//   }
+// }
+
 Error ok = {ERROR_NONE, NULL, NULL};
 
 #define NEW_ERROR(n, t, ref, msg)                                              \
@@ -53,6 +62,8 @@ static char *get_error_type_string(enum ErrorType type) {
     return "Bad Arguments";
   case ERROR_USAGE:
     return "Usage";
+  case ERROR_TODO:
+    return "Not implemented yet";
   default:
     return "No error :)";
   }
@@ -70,7 +81,6 @@ char *get_error_string(Error err) {
 void print_error(Error err) {
   char *err_str = get_error_string(err);
   printf("%s: %s\n", err_str, err.message);
-  free(err_str);
 }
 
 // input for server create
@@ -152,19 +162,45 @@ char *find_and_open_file(char path[]) {
   return data;
 }
 
-void parse(char *data) {
+Token get_next_token(char *data, size_t current_pos) {
+  Error err;
+  size_t pos = current_pos;
+  while (data[pos] != '\0') {
+    switch (data[pos]) {
+    case '*':
+      pos++;
+      return (Token){TOKEN_ARRAY_START, '*'};
+    default:
+      pos++;
+      NEW_ERROR(err, ERROR_TODO, "get_next_token", "character not handled");
+      print_error(err);
+    }
+  }
+  return (Token){TOKEN_EOF, '\0'};
+}
+
+Token *tokenize(char *data) {
+  Error err;
   if (!data) {
-    perror("parser: no data provided");
+    NEW_ERROR(err, ERROR_ARGUMENTS, "tokenize", "no data provided to parse")
+    print_error(err);
     exit(1);
   }
 
-  size_t index = 0;
+  size_t position = 0;
+  // char current_char;
+  Token *tokens = malloc(sizeof(Token) * MAX_TOKENS);
 
-  while (index < strlen(data)) {
-    printf("%c\n", data[index]);
-
-    index = index + 1;
+  while (position < strlen(data)) {
+    Token token = get_next_token(data, position);
+    tokens[position++] = token;
+    if (token.type == TOKEN_EOF) {
+      break;
+    }
+    position++;
   }
+
+  return tokens;
 }
 
 void handle_args(int argc, char **argv) {
@@ -195,7 +231,9 @@ int main(int argc, char **argv) {
 
   char *data = find_and_open_file(argv[1]);
 
-  parse(data);
+  Token *tokens = tokenize(data);
+
+  printf("%c\n", tokens[0].character);
 
   free(data);
   exit(0);
