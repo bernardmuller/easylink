@@ -170,6 +170,9 @@ Token get_next_token(char *data, size_t current_pos) {
     case '*':
       pos++;
       return (Token){TOKEN_ARRAY_START, '*'};
+    case '$':
+      pos++;
+      return (Token){TOKEN_BULK_STRING_START, '$'};
     default:
       pos++;
       NEW_ERROR(err, ERROR_TODO, "get_next_token", "character not handled");
@@ -182,7 +185,7 @@ Token get_next_token(char *data, size_t current_pos) {
 Token *tokenize(char *data) {
   Error err;
   if (!data) {
-    NEW_ERROR(err, ERROR_ARGUMENTS, "tokenize", "no data provided to parse")
+    NEW_ERROR(err, ERROR_ARGUMENTS, "tokenize", "no data provided to parse");
     print_error(err);
     exit(1);
   }
