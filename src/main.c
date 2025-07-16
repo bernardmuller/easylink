@@ -1,4 +1,3 @@
-#include <asm-generic/socket.h>
 #include <ctype.h>
 #include <netdb.h>
 #include <netinet/in.h>
@@ -42,6 +41,7 @@ typedef enum TokenType {
 typedef struct Token {
   TokenType type;
   char *character;
+  size_t position;
 } Token;
 
 typedef struct {
@@ -186,13 +186,15 @@ Token get_next_token(char *data, size_t *current_pos) {
   while (data[pos] != '\0') {
     char current_char = data[pos];
     if (current_char == '*') {
+      pos++;
       *current_pos = pos;
-      return (Token){TOKEN_ARRAY_START, "*"};
+      return (Token){TOKEN_ARRAY_START, "*", pos};
     }
-    // if (current_char == '$') {
-    //   pos++;
-    //   return (Token){TOKEN_BULK_STRING_START, "$"};
-    // }
+    if (current_char == '$') {
+      pos++;
+      *current_pos = pos;
+      return (Token){TOKEN_BULK_STRING_START, "$", pos};
+    }
     // if (current_char == '+') {
     //   pos++;
     //   return (Token){TOKEN_SIMPLE_STRING, "+"};
@@ -236,7 +238,7 @@ Token get_next_token(char *data, size_t *current_pos) {
     // printf("%c\n", data[pos]);
     // print_error(err);
   }
-  return (Token){TOKEN_EOF, "\\0"};
+  return (Token){TOKEN_EOF, "\\0", pos};
 }
 
 TokenArray tokenize(char *data) {
@@ -255,12 +257,11 @@ TokenArray tokenize(char *data) {
 
   while (position < strlen(data)) {
     Token token = get_next_token(data, &position);
-    tokens[position++] = token;
-    token_count++;
+    tokens[token_count++] = token;
     if (token.type == TOKEN_EOF) {
       break;
     }
-    position++;
+    // position++;
   }
 
   // tokens = realloc(tokens, sizeof(Token) * token_count);
@@ -299,8 +300,10 @@ int main(int argc, char **argv) {
 
   TokenArray tokens = tokenize(data);
 
-  for (int i = 0; i <= tokens.size; i++) {
-    printf("%s\n", *&tokens.data[i].character);
+  for (int i = 0; i < tokens.size; i++) {
+    printf("Token %d: type=%d, character='%s', position=%zu\n", i,
+           tokens.data[i].type, tokens.data[i].character,
+           tokens.data[i].position);
   }
 
   free(data);
