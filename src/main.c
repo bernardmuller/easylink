@@ -1,4 +1,5 @@
 #include <asm-generic/socket.h>
+#include <ctype.h>
 #include <netdb.h>
 #include <netinet/in.h>
 #include <netinet/ip.h>
@@ -21,6 +22,7 @@ typedef struct Error {
     ERROR_TODO,
     ERROR_MEMORY,
     ERROR_ARGUMENTS,
+    ERROR_UNEXPECTED_CHAR,
     ERROR_USAGE
   } type;
   const char *reference;
@@ -31,14 +33,21 @@ typedef enum TokenType {
   TOKEN_ARRAY_START,
   TOKEN_NUMBER,
   TOKEN_BULK_STRING_START,
+  TOKEN_SIMPLE_STRING,
   TOKEN_CRLF,
+  TOKEN_ERROR_START,
   TOKEN_EOF
 } TokenType;
 
 typedef struct Token {
   TokenType type;
-  char character;
+  char *character;
 } Token;
+
+typedef struct {
+  Token *data;
+  int size;
+} TokenArray;
 
 // Token scan_token(char *c) {
 //   switch (c) {
@@ -64,6 +73,8 @@ static char *get_error_type_string(enum ErrorType type) {
     return "Usage";
   case ERROR_TODO:
     return "Not implemented yet";
+  case ERROR_UNEXPECTED_CHAR:
+    return "Unexpected character";
   default:
     return "No error :)";
   }
@@ -162,27 +173,73 @@ char *find_and_open_file(char path[]) {
   return data;
 }
 
-Token get_next_token(char *data, size_t current_pos) {
-  Error err;
-  size_t pos = current_pos;
-  while (data[pos] != '\0') {
-    switch (data[pos]) {
-    case '*':
-      pos++;
-      return (Token){TOKEN_ARRAY_START, '*'};
-    case '$':
-      pos++;
-      return (Token){TOKEN_BULK_STRING_START, '$'};
-    default:
-      pos++;
-      NEW_ERROR(err, ERROR_TODO, "get_next_token", "character not handled");
-      print_error(err);
-    }
+char peek(char *data, size_t position) {
+  if (position >= strlen(data)) {
+    return '\0';
   }
-  return (Token){TOKEN_EOF, '\0'};
+  return data[position + 1];
 }
 
-Token *tokenize(char *data) {
+Token get_next_token(char *data, size_t *current_pos) {
+  Error err;
+  size_t pos = *current_pos;
+  while (data[pos] != '\0') {
+    char current_char = data[pos];
+    if (current_char == '*') {
+      *current_pos = pos;
+      return (Token){TOKEN_ARRAY_START, "*"};
+    }
+    // if (current_char == '$') {
+    //   pos++;
+    //   return (Token){TOKEN_BULK_STRING_START, "$"};
+    // }
+    // if (current_char == '+') {
+    //   pos++;
+    //   return (Token){TOKEN_SIMPLE_STRING, "+"};
+    // }
+    // if (current_char == '-') {
+    //   pos++;
+    //   return (Token){TOKEN_ERROR_START, "-"};
+    // }
+    // if (current_char == '\\') {
+    //   if (peek(data, pos) == 'r') {
+    //     pos++;
+    //     if (peek(data, pos) == '\0' || peek(data, pos + 1) == '\0') {
+    //       NEW_ERROR(err, ERROR_UNEXPECTED_CHAR, "get_next_token",
+    //                 "Unexpected end of line");
+    //       print_error(err);
+    //       // TODO: this might need to be a return later down the line
+    //       exit(1);
+    //     }
+    //     pos++;
+    //     if (data[pos] == '\\' && peek(data, pos) != 'n') {
+    //       printf("whoops 1: %c\n", peek(data, pos));
+    //       NEW_ERROR(err, ERROR_UNEXPECTED_CHAR, "get_next_token",
+    //                 "Unexpected end of line");
+    //       print_error(err);
+    //       // TODO: this might need to be a return later down the line
+    //       exit(1);
+    //     }
+    //     return (Token){TOKEN_CRLF, "\\r\\n"};
+    //   }
+    //   pos++;
+    // }
+    // if (isdigit(data[pos]) == 0) {
+    //   printf("isdigit %c\n", data[pos]);
+    //   pos++;
+    //   return (Token){TOKEN_ERROR_START, &data[pos]};
+    // }
+    //
+    pos++;
+
+    // NEW_ERROR(err, ERROR_TODO, "get_next_token", "character not handled");
+    // printf("%c\n", data[pos]);
+    // print_error(err);
+  }
+  return (Token){TOKEN_EOF, "\\0"};
+}
+
+TokenArray tokenize(char *data) {
   Error err;
   if (!data) {
     NEW_ERROR(err, ERROR_ARGUMENTS, "tokenize", "no data provided to parse");
@@ -192,18 +249,24 @@ Token *tokenize(char *data) {
 
   size_t position = 0;
   // char current_char;
+  int token_count = 0;
   Token *tokens = malloc(sizeof(Token) * MAX_TOKENS);
+  TokenArray token_data;
 
   while (position < strlen(data)) {
-    Token token = get_next_token(data, position);
+    Token token = get_next_token(data, &position);
     tokens[position++] = token;
+    token_count++;
     if (token.type == TOKEN_EOF) {
       break;
     }
     position++;
   }
 
-  return tokens;
+  // tokens = realloc(tokens, sizeof(Token) * token_count);
+  token_data.data = tokens;
+  token_data.size = token_count;
+  return token_data;
 }
 
 void handle_args(int argc, char **argv) {
@@ -234,10 +297,13 @@ int main(int argc, char **argv) {
 
   char *data = find_and_open_file(argv[1]);
 
-  Token *tokens = tokenize(data);
+  TokenArray tokens = tokenize(data);
 
-  printf("%c\n", tokens[0].character);
+  for (int i = 0; i <= tokens.size; i++) {
+    printf("%s\n", *&tokens.data[i].character);
+  }
 
   free(data);
+  free(tokens.data);
   exit(0);
 }
