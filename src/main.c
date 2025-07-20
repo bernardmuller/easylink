@@ -227,16 +227,17 @@ Token get_next_token(char *data, size_t *current_pos) {
         return (Token){TOKEN_LB, "\\n", pos};
       }
     }
-    // if (isdigit(data[pos]) != 0) {
-    //   char *buf[50];
-    //   while (peek(data, pos) != '\\') {
-    //     pos++;
-    //     strncat(data[pos], buf, 1);
-    //   }
-    //   *current_pos = pos;
-    //   return (Token){TOKEN_NUMBER, "digit", pos};
-    // }
-    //
+    if (isdigit(data[pos]) != 0) {
+      int buf_idx = 0;
+      static char buf[10];
+      while (data[pos] != '\\' && peek(data, pos) != '\r') {
+        buf[buf_idx++] = data[pos];
+        pos++;
+      }
+      buf[buf_idx] = '\0';
+      *current_pos = pos;
+      return (Token){TOKEN_NUMBER, stringdup(buf), pos};
+    }
     if (isprint(current_char) != 0) {
       static char buf[1024];
       int buf_idx = 0;
@@ -250,10 +251,6 @@ Token get_next_token(char *data, size_t *current_pos) {
     }
 
     pos++;
-
-    // NEW_ERROR(err, ERROR_TODO, "get_next_token", "character not handled");
-    // printf("%c\n", data[pos]);
-    // print_error(err);
   }
   return (Token){TOKEN_EOF, "\\0", pos};
 }
