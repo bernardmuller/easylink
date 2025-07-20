@@ -33,7 +33,8 @@ typedef enum TokenType {
   TOKEN_NUMBER,
   TOKEN_BULK_STRING_START,
   TOKEN_SIMPLE_STRING,
-  TOKEN_CRLF,
+  TOKEN_LB,
+  TOKEN_R,
   TOKEN_ERROR_START,
   TOKEN_EOF
 } TokenType;
@@ -78,6 +79,15 @@ static char *get_error_type_string(enum ErrorType type) {
   default:
     return "No error :)";
   }
+}
+
+char *stringdup(const char *str) {
+  size_t len = strlen(str) + 1;
+  char *copy = malloc(len);
+  if (copy) {
+    memcpy(copy, str, len);
+  }
+  return copy;
 }
 
 char *get_error_string(Error err) {
@@ -195,43 +205,50 @@ Token get_next_token(char *data, size_t *current_pos) {
       *current_pos = pos;
       return (Token){TOKEN_BULK_STRING_START, "$", pos};
     }
-    // if (current_char == '+') {
-    //   pos++;
-    //   return (Token){TOKEN_SIMPLE_STRING, "+"};
-    // }
-    // if (current_char == '-') {
-    //   pos++;
-    //   return (Token){TOKEN_ERROR_START, "-"};
-    // }
-    // if (current_char == '\\') {
-    //   if (peek(data, pos) == 'r') {
+    if (current_char == '+') {
+      pos++;
+      *current_pos = pos;
+      return (Token){TOKEN_SIMPLE_STRING, "+", pos};
+    }
+    if (current_char == '-') {
+      pos++;
+      *current_pos = pos;
+      return (Token){TOKEN_ERROR_START, "-", pos};
+    }
+    if (current_char == '\\') {
+      if (peek(data, pos) == 'r') {
+        pos = pos + 2;
+        *current_pos = pos;
+        return (Token){TOKEN_R, "\\r", pos};
+      }
+      if (peek(data, pos) == 'n') {
+        pos = pos + 2;
+        *current_pos = pos;
+        return (Token){TOKEN_LB, "\\n", pos};
+      }
+    }
+    // if (isdigit(data[pos]) != 0) {
+    //   char *buf[50];
+    //   while (peek(data, pos) != '\\') {
     //     pos++;
-    //     if (peek(data, pos) == '\0' || peek(data, pos + 1) == '\0') {
-    //       NEW_ERROR(err, ERROR_UNEXPECTED_CHAR, "get_next_token",
-    //                 "Unexpected end of line");
-    //       print_error(err);
-    //       // TODO: this might need to be a return later down the line
-    //       exit(1);
-    //     }
-    //     pos++;
-    //     if (data[pos] == '\\' && peek(data, pos) != 'n') {
-    //       printf("whoops 1: %c\n", peek(data, pos));
-    //       NEW_ERROR(err, ERROR_UNEXPECTED_CHAR, "get_next_token",
-    //                 "Unexpected end of line");
-    //       print_error(err);
-    //       // TODO: this might need to be a return later down the line
-    //       exit(1);
-    //     }
-    //     return (Token){TOKEN_CRLF, "\\r\\n"};
+    //     strncat(data[pos], buf, 1);
     //   }
-    //   pos++;
-    // }
-    // if (isdigit(data[pos]) == 0) {
-    //   printf("isdigit %c\n", data[pos]);
-    //   pos++;
-    //   return (Token){TOKEN_ERROR_START, &data[pos]};
+    //   *current_pos = pos;
+    //   return (Token){TOKEN_NUMBER, "digit", pos};
     // }
     //
+    if (isprint(current_char) != 0) {
+      static char buf[1024];
+      int buf_idx = 0;
+      while (data[pos] != '\\' && peek(data, pos) != 'r') {
+        buf[buf_idx++] = data[pos];
+        pos++;
+      }
+      buf[buf_idx] = '\0';
+      *current_pos = pos;
+      return (Token){TOKEN_SIMPLE_STRING, stringdup(buf), pos};
+    }
+
     pos++;
 
     // NEW_ERROR(err, ERROR_TODO, "get_next_token", "character not handled");
@@ -250,7 +267,6 @@ TokenArray tokenize(char *data) {
   }
 
   size_t position = 0;
-  // char current_char;
   int token_count = 0;
   Token *tokens = malloc(sizeof(Token) * MAX_TOKENS);
   TokenArray token_data;
@@ -261,13 +277,20 @@ TokenArray tokenize(char *data) {
     if (token.type == TOKEN_EOF) {
       break;
     }
-    // position++;
   }
 
-  // tokens = realloc(tokens, sizeof(Token) * token_count);
   token_data.data = tokens;
   token_data.size = token_count;
   return token_data;
+}
+
+void free_tokens(TokenArray *tokens) {
+  for (int i = 0; i < tokens->size; i++) {
+    if (tokens->data[i].type == TOKEN_SIMPLE_STRING) {
+      free(tokens->data[i].character);
+    }
+  }
+  free(tokens->data);
 }
 
 void handle_args(int argc, char **argv) {
@@ -307,6 +330,6 @@ int main(int argc, char **argv) {
   }
 
   free(data);
-  free(tokens.data);
+  free_tokens(&tokens);
   exit(0);
 }
