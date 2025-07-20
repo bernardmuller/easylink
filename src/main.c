@@ -22,20 +22,22 @@ typedef struct Error {
     ERROR_MEMORY,
     ERROR_ARGUMENTS,
     ERROR_UNEXPECTED_CHAR,
-    ERROR_USAGE
+    ERROR_USAGE,
+    ERROR_MALFORMED
   } type;
   const char *reference;
   const char *message;
 } Error;
 
 typedef enum TokenType {
-  TOKEN_ARRAY_START,
-  TOKEN_NUMBER,
-  TOKEN_BULK_STRING_START,
-  TOKEN_SIMPLE_STRING,
-  TOKEN_LB,
-  TOKEN_R,
+  TOKEN_STRING,
   TOKEN_ERROR_START,
+  TOKEN_NUMBER,
+  TOKEN_BULK_STRING,
+  TOKEN_ARRAY,
+  TOKEN_LINE_BREAK,
+  TOKEN_CARRIAGE_RETURN,
+  TOKEN_CRLF,
   TOKEN_EOF
 } TokenType;
 
@@ -49,14 +51,6 @@ typedef struct {
   Token *data;
   int size;
 } TokenArray;
-
-// Token scan_token(char *c) {
-//   switch (c) {
-//     case "\\":
-//     default:
-//       ""
-//   }
-// }
 
 Error ok = {ERROR_NONE, NULL, NULL};
 
@@ -198,17 +192,17 @@ Token get_next_token(char *data, size_t *current_pos) {
     if (current_char == '*') {
       pos++;
       *current_pos = pos;
-      return (Token){TOKEN_ARRAY_START, "*", pos};
+      return (Token){TOKEN_ARRAY, "*", pos};
     }
     if (current_char == '$') {
       pos++;
       *current_pos = pos;
-      return (Token){TOKEN_BULK_STRING_START, "$", pos};
+      return (Token){TOKEN_BULK_STRING, "$", pos};
     }
     if (current_char == '+') {
       pos++;
       *current_pos = pos;
-      return (Token){TOKEN_SIMPLE_STRING, "+", pos};
+      return (Token){TOKEN_STRING, "+", pos};
     }
     if (current_char == '-') {
       pos++;
@@ -216,15 +210,21 @@ Token get_next_token(char *data, size_t *current_pos) {
       return (Token){TOKEN_ERROR_START, "-", pos};
     }
     if (current_char == '\\') {
-      if (peek(data, pos) == 'r') {
-        pos = pos + 2;
-        *current_pos = pos;
-        return (Token){TOKEN_R, "\\r", pos};
-      }
       if (peek(data, pos) == 'n') {
         pos = pos + 2;
         *current_pos = pos;
-        return (Token){TOKEN_LB, "\\n", pos};
+        return (Token){TOKEN_LINE_BREAK, "\\n", pos};
+      }
+      if (peek(data, pos) == 'r') {
+        if (peek(data, pos + 1) != '\\' && peek(data, pos + 2) != 'n') {
+          NEW_ERROR(err, ERROR_MALFORMED, "get_next_token: CRLF",
+                    "malformed carriage return line feed")
+          print_error(err);
+          exit(1);
+        }
+        pos = pos + 4;
+        *current_pos = pos;
+        return (Token){TOKEN_CRLF, "\\r\\n", pos};
       }
     }
     if (isdigit(data[pos]) != 0) {
@@ -247,10 +247,13 @@ Token get_next_token(char *data, size_t *current_pos) {
       }
       buf[buf_idx] = '\0';
       *current_pos = pos;
-      return (Token){TOKEN_SIMPLE_STRING, stringdup(buf), pos};
+      return (Token){TOKEN_STRING, stringdup(buf), pos};
     }
 
-    pos++;
+    NEW_ERROR(err, ERROR_UNEXPECTED_CHAR, "get_next_token",
+              "unexpected character")
+    print_error(err);
+    exit(1);
   }
   return (Token){TOKEN_EOF, "\\0", pos};
 }
@@ -283,7 +286,7 @@ TokenArray tokenize(char *data) {
 
 void free_tokens(TokenArray *tokens) {
   for (int i = 0; i < tokens->size; i++) {
-    if (tokens->data[i].type == TOKEN_SIMPLE_STRING) {
+    if (tokens->data[i].type == TOKEN_STRING) {
       free(tokens->data[i].character);
     }
   }
@@ -311,6 +314,14 @@ void handle_args(int argc, char **argv) {
   }
 }
 
+void print_tokens(TokenArray tokens) {
+  for (int i = 0; i < tokens.size; i++) {
+    printf("Token %d: type=%d, character='%s', position=%zu\n", i,
+           tokens.data[i].type, tokens.data[i].character,
+           tokens.data[i].position);
+  }
+}
+
 int main(int argc, char **argv) {
   handle_args(argc, argv);
 
@@ -320,11 +331,7 @@ int main(int argc, char **argv) {
 
   TokenArray tokens = tokenize(data);
 
-  for (int i = 0; i < tokens.size; i++) {
-    printf("Token %d: type=%d, character='%s', position=%zu\n", i,
-           tokens.data[i].type, tokens.data[i].character,
-           tokens.data[i].position);
-  }
+  print_tokens(tokens);
 
   free(data);
   free_tokens(&tokens);
