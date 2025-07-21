@@ -30,7 +30,7 @@ typedef struct Error {
 } Error;
 
 typedef enum TokenType {
-  TOKEN_STRING,
+  TOKEN_SIMPLE_STRING,
   TOKEN_ERROR_START,
   TOKEN_NUMBER,
   TOKEN_BULK_STRING,
@@ -38,6 +38,7 @@ typedef enum TokenType {
   TOKEN_LINE_BREAK,
   TOKEN_CARRIAGE_RETURN,
   TOKEN_CRLF,
+  TOKEN_STRING,
   TOKEN_EOF
 } TokenType;
 
@@ -189,6 +190,7 @@ Token get_next_token(char *data, size_t *current_pos) {
   size_t pos = *current_pos;
   while (data[pos] != '\0') {
     char current_char = data[pos];
+    printf("islexing: %c\n", current_char);
     if (current_char == '*') {
       pos++;
       *current_pos = pos;
@@ -202,7 +204,7 @@ Token get_next_token(char *data, size_t *current_pos) {
     if (current_char == '+') {
       pos++;
       *current_pos = pos;
-      return (Token){TOKEN_STRING, "+", pos};
+      return (Token){TOKEN_SIMPLE_STRING, "+", pos};
     }
     if (current_char == '-') {
       pos++;
@@ -230,7 +232,7 @@ Token get_next_token(char *data, size_t *current_pos) {
     if (isdigit(data[pos]) != 0) {
       int buf_idx = 0;
       static char buf[10];
-      while (data[pos] != '\\' && peek(data, pos) != '\r') {
+      while (data[pos] != '\\' && data[pos] != '\0' && buf_idx < 9) {
         buf[buf_idx++] = data[pos];
         pos++;
       }
@@ -239,9 +241,9 @@ Token get_next_token(char *data, size_t *current_pos) {
       return (Token){TOKEN_NUMBER, stringdup(buf), pos};
     }
     if (isprint(current_char) != 0) {
-      static char buf[1024];
+      char buf[1024];
       int buf_idx = 0;
-      while (data[pos] != '\\' && peek(data, pos) != 'r') {
+      while (data[pos] != '\\' && data[pos] != '\0' && buf_idx < 1023) {
         buf[buf_idx++] = data[pos];
         pos++;
       }
@@ -286,7 +288,8 @@ TokenArray tokenize(char *data) {
 
 void free_tokens(TokenArray *tokens) {
   for (int i = 0; i < tokens->size; i++) {
-    if (tokens->data[i].type == TOKEN_STRING) {
+    if (tokens->data[i].type == TOKEN_STRING ||
+        tokens->data[i].type == TOKEN_NUMBER) {
       free(tokens->data[i].character);
     }
   }
