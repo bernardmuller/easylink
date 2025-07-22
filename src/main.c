@@ -190,7 +190,6 @@ Token get_next_token(char *data, size_t *current_pos) {
   size_t pos = *current_pos;
   while (data[pos] != '\0') {
     char current_char = data[pos];
-    printf("islexing: %c\n", current_char);
     if (current_char == '*') {
       pos++;
       *current_pos = pos;
