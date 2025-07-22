@@ -4,7 +4,7 @@ INCLUDES = -I./includes
 SRCDIR = src
 BUILDDIR = build
 SOURCES = $(wildcard $(SRCDIR)/*.c)
-MAIN_SOURCE = $(wildcard $(SRCDIR)/*.c)
+MAIN_SOURCE = $(wildcard $(SRCDIR)/main.c)
 OBJECTS = $(SOURCES:$(SRCDIR)/%.c=$(BUILDDIR)/%.o)
 MAIN_OBJECT = $(MAIN_SOURCE:$(SRCDIR)/%.c=$(BUILDDIR)/%.o)
 TARGET = myprogram
