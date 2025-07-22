@@ -4,7 +4,9 @@ INCLUDES = -I./includes
 SRCDIR = src
 BUILDDIR = build
 SOURCES = $(wildcard $(SRCDIR)/*.c)
+MAIN_SOURCE = $(wildcard $(SRCDIR)/*.c)
 OBJECTS = $(SOURCES:$(SRCDIR)/%.c=$(BUILDDIR)/%.o)
+MAIN_OBJECT = $(MAIN_SOURCE:$(SRCDIR)/%.c=$(BUILDDIR)/%.o)
 TARGET = myprogram
 
 .PHONY: all clean
@@ -13,6 +15,14 @@ all: $(BUILDDIR)/$(TARGET)
 
 $(BUILDDIR)/$(TARGET): $(OBJECTS) | $(BUILDDIR)
 	$(CC) $(OBJECTS) -o $@
+
+$(BUILDDIR)/%.o: $(SRCDIR)/%.c | $(BUILDDIR)
+	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
+
+main: $(BUILDDIR)/$(TARGET)
+
+$(BUILDDIR)/$(TARGET): $(MAIN_OBJECT) | $(BUILDDIR)
+	$(CC) $(MAIN_OBJECT) -o $@
 
 $(BUILDDIR)/%.o: $(SRCDIR)/%.c | $(BUILDDIR)
 	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
