@@ -48,10 +48,23 @@ typedef struct Token {
   size_t position;
 } Token;
 
+typedef enum NodeType {
+  NODE_SIMPLE_STRING,
+  NODE_ARRAY,
+  NODE_INTEGER,
+  NODE_BULK_STRING,
+  NODE_ERROR
+} NodeType;
+
 typedef struct {
   Token *data;
   int size;
 } TokenArray;
+
+typedef struct Node {
+  Token *elements;
+  int size;
+} Node;
 
 Error ok = {ERROR_NONE, NULL, NULL};
 
