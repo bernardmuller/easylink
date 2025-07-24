@@ -30,6 +30,7 @@ typedef struct Error {
 } Error;
 
 typedef enum TokenType {
+  TOKEN_NONE,
   TOKEN_SIMPLE_STRING,
   TOKEN_ERROR_START,
   TOKEN_NUMBER,
@@ -148,6 +149,68 @@ void signal_handler(int sig) {
 //
 //   return server;
 // };
+
+void parse_simple_string() {}
+
+void parse_token(Token token) {}
+
+Token *peek_token_ahead(TokenArray *tokens, size_t pos, size_t distance) {
+  if ((pos + distance) > tokens->size) {
+    return NULL;
+  }
+  return &tokens->data[pos + distance];
+}
+
+Node *parser(TokenArray *tokens) {
+  Error err;
+  if (!tokens || tokens->size == 0) {
+    NEW_ERROR(err, ERROR_ARGUMENTS, "parser", "no data provided to parse");
+    print_error(err);
+    exit(1);
+  }
+  int position = 0;
+  int node_count = 0;
+
+  Node *nodes = malloc(sizeof(Node) * tokens->size);
+
+  while (position < tokens->size) {
+    if (position >= tokens->size) {
+      printf("WARNING: position %d exceeds array size\n", position);
+      break;
+    }
+
+    if (!tokens->data[position].character || !tokens->data[position].type) {
+      printf("WARNING: null token data at position %d\n", position);
+      position++;
+      continue;
+    }
+
+    printf("token: %s\n", tokens->data[position].character);
+    position++;
+    //   if (tokens->data[position].type == TOKEN_SIMPLE_STRING) {
+    //     printf("parsing SIMPLE_STRING");
+    //     Node node;
+    //     node.elements[position] = tokens->data[position];
+    //     if (peek_token_ahead(tokens, position, 1)->type != TOKEN_STRING) {
+    //       NEW_ERROR(err, ERROR_MALFORMED, "parse", "Unexpected token");
+    //       print_error(err);
+    //       exit(1);
+    //     }
+    //     position++;
+    //     node.elements[position] = tokens->data[position];
+    //     if (peek_token_ahead(tokens, position, 1)->type != TOKEN_CRLF) {
+    //       NEW_ERROR(err, ERROR_MALFORMED, "parse", "Unexpected token");
+    //       print_error(err);
+    //       exit(1);
+    //     }
+    //     position++;
+    //     node.elements[position] = tokens->data[position];
+    //
+    //     nodes[node_count] = node;
+    //   }
+  }
+  return nodes;
+}
 
 char *find_and_open_file(char path[]) {
   FILE *file_p;
@@ -347,6 +410,8 @@ int main(int argc, char **argv) {
   TokenArray tokens = tokenize(data);
 
   print_tokens(tokens);
+
+  parser(&tokens);
 
   free(data);
   free_tokens(&tokens);
