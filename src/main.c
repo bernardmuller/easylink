@@ -63,8 +63,15 @@ typedef struct {
 } TokenArray;
 
 typedef struct Node {
-  Token *elements;
-  int size;
+  NodeType type;
+  union {
+    char *string_value; // for bulk strings, simple strings, errors
+    // long integer_value; // for integers
+    struct {
+      struct Node **elements; // array of Node pointers
+      int count;
+    } array_value;
+  } data;
 } Node;
 
 Error ok = {ERROR_NONE, NULL, NULL};
@@ -185,29 +192,24 @@ Node *parser(TokenArray *tokens) {
       continue;
     }
 
-    printf("token: %s\n", tokens->data[position].character);
-    position++;
-    //   if (tokens->data[position].type == TOKEN_SIMPLE_STRING) {
-    //     printf("parsing SIMPLE_STRING");
-    //     Node node;
-    //     node.elements[position] = tokens->data[position];
-    //     if (peek_token_ahead(tokens, position, 1)->type != TOKEN_STRING) {
-    //       NEW_ERROR(err, ERROR_MALFORMED, "parse", "Unexpected token");
-    //       print_error(err);
-    //       exit(1);
-    //     }
-    //     position++;
-    //     node.elements[position] = tokens->data[position];
-    //     if (peek_token_ahead(tokens, position, 1)->type != TOKEN_CRLF) {
-    //       NEW_ERROR(err, ERROR_MALFORMED, "parse", "Unexpected token");
-    //       print_error(err);
-    //       exit(1);
-    //     }
-    //     position++;
-    //     node.elements[position] = tokens->data[position];
-    //
-    //     nodes[node_count] = node;
-    //   }
+    if (tokens->data[position].type == TOKEN_SIMPLE_STRING) {
+      Node node;
+      node.type = NODE_SIMPLE_STRING;
+      if (peek_token_ahead(tokens, position, 1)->type != TOKEN_STRING) {
+        NEW_ERROR(err, ERROR_MALFORMED, "parse", "Unexpected token");
+        print_error(err);
+        exit(1);
+      }
+      if (peek_token_ahead(tokens, position, 2)->type != TOKEN_CRLF) {
+        NEW_ERROR(err, ERROR_MALFORMED, "parse", "Unexpected token");
+        print_error(err);
+        exit(1);
+      }
+      node.data.string_value = tokens->data[position + 1].character;
+      nodes[node_count] = node;
+      node_count++;
+      position = position + 3;
+    }
   }
   return nodes;
 }
@@ -400,6 +402,12 @@ void print_tokens(TokenArray tokens) {
   }
 }
 
+void print_node(Node *node) {
+  if (node->type == NODE_SIMPLE_STRING) {
+    printf("Parsed simple string: %s\n", node->data.string_value);
+  }
+}
+
 int main(int argc, char **argv) {
   handle_args(argc, argv);
 
@@ -411,7 +419,9 @@ int main(int argc, char **argv) {
 
   print_tokens(tokens);
 
-  parser(&tokens);
+  Node *node = parser(&tokens);
+
+  print_node(node);
 
   free(data);
   free_tokens(&tokens);

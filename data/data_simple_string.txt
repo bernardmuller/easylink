@@ -1,1 +1,1 @@
-+Hello, World! This is my lexer. :)\r\n
++Hello, Easylink!\r\n
