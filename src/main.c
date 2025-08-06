@@ -120,21 +120,19 @@ void print_error(Error err) {
   printf("%s: %s\n", err_str, err.message);
 }
 
-// input for server create
-// typedef struct {
-//   const char *port;
-//   int backlog;
-//   int max_connections;
-// } server_t_config;
-//
-// // output of server create
-// typedef struct {
-//   int server_fd;
-//   struct addrinfo *servinfo; // linked list of addresses
-//   server_t_config config;
-//   int active;
-// } server_t;
-//
+typedef struct {
+  const char *port;
+  int backlog;
+  int max_connections;
+} server_t_config;
+
+typedef struct {
+  int server_fd;
+  struct addrinfo *servinfo; // linked list of addresses
+  server_t_config config;
+  int active;
+} server_t;
+
 void signal_handler(int sig) {
   printf("SIG CAUGHT: %d\n", sig);
   exit(sig);
