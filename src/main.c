@@ -194,12 +194,14 @@ Node *parser(TokenArray *tokens) {
       Node node;
       node.type = NODE_SIMPLE_STRING;
       if (peek_token_ahead(tokens, position, 1)->type != TOKEN_STRING) {
-        NEW_ERROR(err, ERROR_MALFORMED, "parse", "Unexpected token");
+        NEW_ERROR(err, ERROR_MALFORMED, "parse_simple_string",
+                  "Unexpected token");
         print_error(err);
         exit(1);
       }
       if (peek_token_ahead(tokens, position, 2)->type != TOKEN_CRLF) {
-        NEW_ERROR(err, ERROR_MALFORMED, "parse", "Unexpected token");
+        NEW_ERROR(err, ERROR_MALFORMED, "parse_simple_string",
+                  "Unexpected token");
         print_error(err);
         exit(1);
       }
@@ -207,6 +209,35 @@ Node *parser(TokenArray *tokens) {
       nodes[node_count] = node;
       node_count++;
       position = position + 3;
+    }
+
+    if (tokens->data[position].type == TOKEN_BULK_STRING) {
+      Node node;
+      node.type = NODE_BULK_STRING;
+      size_t size;
+      if (peek_token_ahead(tokens, position, 1)->type != TOKEN_NUMBER) {
+        NEW_ERROR(err, ERROR_MALFORMED, "parse_bulk_string",
+                  "Unexpected token");
+        print_error(err);
+        exit(1);
+      }
+      if (peek_token_ahead(tokens, position, 2)->type != TOKEN_CRLF) {
+        NEW_ERROR(err, ERROR_MALFORMED, "parse_bulk_string",
+                  "Unexpected token");
+        print_error(err);
+        exit(1);
+      }
+      position = position + 3;
+      node.data.string_value = tokens->data[position].character;
+      if (peek_token_ahead(tokens, position, 1)->type != TOKEN_CRLF) {
+        NEW_ERROR(err, ERROR_MALFORMED, "parse_bulk_string",
+                  "Unexpected token");
+        print_error(err);
+        exit(1);
+      }
+      nodes[node_count] = node;
+      node_count++;
+      position = position + 1;
     }
   }
   return nodes;
